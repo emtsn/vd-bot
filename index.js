@@ -2,23 +2,14 @@ const { prefix, token } = require('./config.json');
 const Discord = require('discord.js');
 const client = new Discord.Client();
 const { TriviaSession, TriviaQuestion } = require('./trivia.js');
+const { Poll } = require('./poll.js');
 const Util = require('./util.js');
 const fetch = require('node-fetch');
 const ytdl = require('ytdl-core');
 
-const numberEmojis = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-
-const pollOptions = {
-    ALLOW_MULTIVOTE: 0,
-    LAST_VOTED: 1,
-    SPLIT_VOTE: 2,
-    RANDOMIZE_MULTIVOTE: 3,
-};
-Object.freeze(pollOptions);
-const pollOption = pollOptions.LAST_VOTED;
-
 // TODO: handle multiple channels, servers, trivia, poll at a time
 let trivia;
+let poll;
 
 client.once('ready', () => {
     console.log('Ready!');
@@ -50,10 +41,10 @@ client.on('message', message => {
 function runCommand(message, command, split) {
     switch (command) {
         case 'poll':
-            if (split.length > 3) {
+            if ((!poll || !poll.active) && split.length > 3) {
                 let timer = parseInt(split[1]);
                 if (isNaN(timer)) timer = 0;
-                initPoll(message.channel, timer, split.slice(2, split.length));
+                startPoll(message.channel, timer, split.slice(2, split.length));
             }
             break;
         case 'trivia':
@@ -76,7 +67,11 @@ function runCommand(message, command, split) {
                 let max = parseInt(split[2]);
                 min = isNaN(min) ? 0 : min;
                 max = isNaN(max) ? min + 1 : max;
-                if (max <= min) max = min + 1;
+                if (max < min) {
+                    const temp = max;
+                    max = min;
+                    min = temp;
+                }
                 message.channel.send(`Roll [${min},${max}]: ${Util.random(min, max)}`);
             } else {
                 message.channel.send(`Usage: ${prefix}random [number] [number]`);
@@ -98,130 +93,14 @@ function runCommand(message, command, split) {
 }
 
 /**
- * Initialize a poll
+ * Start a poll
  * @param {TextChannel | DMChannel | NewsChannel} channel The channel where the poll will be active on
  * @param {number} timer The number of seconds that the poll will be open for
  * @param {string[]} options Options that the users will be polling on
  */
-function initPoll(channel, timer, options) {
-    const pollMsgHeader = `Poll (${timer} seconds):\n`;
-    let pollMsgBody = '';
-    for (let index = 0; index < options.length; index++) {
-        pollMsgBody += `${(index + 1)}. ${options[index]}\n`;
-    }
-    channel.send(pollMsgHeader + 'Setting up poll...')
-        .then(pollMsg => {
-            for (let index = 0; index < options.length; index++) {
-                if (index + 1 < numberEmojis.length) {
-                    pollMsg.react(numberEmojis[index + 1])
-                        .catch(console.error);
-                }
-            }
-            if (options.length <= numberEmojis.length) {
-                pollMsg.react(numberEmojis[options.length - 1])
-                    .then(() => {
-                        pollMsg.edit(pollMsgHeader + pollMsgBody);
-                        startPoll(channel, timer, options, pollMsg);
-                    })
-                    .catch(console.error);
-            }
-        });
-}
-
-// TODO: move poll to poll.js
-/**
- * Start the poll
- * @param {TextChannel | DMChannel | NewsChannel} channel The channel where the poll will be active on
- * @param {number} timer The number of seconds that the poll will be open for
- * @param {string[]} options Options that the users will be polling on
- * @param {Message} pollMsg The message that was sent to display the poll
- */
-function startPoll(channel, timer, options, pollMsg) {
-    const filter = (reaction) => {
-        return numberEmojis.includes(reaction.emoji.name);
-    };
-    const collector = pollMsg.createReactionCollector(filter, { time: timer * 1000 });
-    const userToVote = new Map();
-    // TODO: add text input option to voting
-    collector.on('collect', (reaction, user) => {
-        const found = numberEmojis.indexOf(reaction.emoji.name);
-        if (found >= 0) {
-            channel.send(`${user} voted for ${options[found - 1]}`);
-            if (userToVote.has(user)) {
-                userToVote.get(user).push(found);
-            } else {
-                userToVote.set(user, [found]);
-            }
-        }
-    });
-    collector.on('end', () => {
-        endPoll(channel, userToVote, options);
-    });
-}
-
-/**
- * End the poll and show the results.
- * @param {TextChannel | DMChannel | NewsChannel} channel
- * @param {Map<User, Array>} userToVote
- * @param {string[]} options
- */
-function endPoll(channel, userToVote, options) {
-    console.log(userToVote);
-    const emojiCounts = new Array(numberEmojis.length).fill(0);
-    for (const [user, votes] of userToVote) {
-        if (user.id !== client.user.id) {
-            switch (pollOption) {
-                case pollOptions.ALLOW_MULTIVOTE:
-                    // vote goes to every option voted for
-                    votes.forEach(v => {
-                        emojiCounts[v]++;
-                        console.log(`Add 1 to ${v}`);
-                    });
-                    break;
-                case pollOptions.LAST_VOTED:
-                    // vote goes to last option voted for
-                    emojiCounts[votes[votes.length - 1]]++;
-                    break;
-                case pollOptions.SPLIT_VOTE:
-                    // vote is split between every option voted for
-                    votes.forEach(v => {
-                        emojiCounts[v] += 1 / votes.length;
-                        console.log(`Add ${1 / votes.length} to ${v}`);
-                    });
-                    break;
-                case pollOptions.RANDOMIZE_MULTIVOTE:
-                    // vote is randomized between every option voted for
-                    emojiCounts[votes[Math.floor(Math.random() * votes.length)]]++;
-                    break;
-            }
-        }
-    }
-    let greatest = emojiCounts[0];
-    let indicesOfGreatest = [];
-    for (let index = 1; index <= emojiCounts.length; index++) {
-        if (emojiCounts[index] > greatest) {
-            greatest = emojiCounts[index];
-            indicesOfGreatest = [index];
-        } else if (emojiCounts[index] === greatest) {
-            indicesOfGreatest.push(index);
-        }
-    }
-    if (greatest > 0) {
-        let result = 'Result: ';
-        for (let index = 0; index < indicesOfGreatest.length; index++) {
-            // should always be true as 0 is never added to indicesOfGreatest
-            if (indicesOfGreatest[index] > 0) {
-                result += options[indicesOfGreatest[index] - 1];
-                if (index < indicesOfGreatest.length - 1) {
-                    result += ', ';
-                }
-            }
-        }
-        result += ` with ${Math.floor(greatest * 100) / 100} ${greatest === 1 ? 'vote' : 'votes'}`;
-        channel.send(result);
-    } else {
-        channel.send('Not enough votes.');
-    }
+function startPoll(channel, timer, options) {
+    poll = new Poll(channel, timer, options, client.user.id);
+    poll.start();
 }
 
 /**

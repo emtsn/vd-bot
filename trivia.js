@@ -102,11 +102,11 @@ class TriviaQuestion {
         this.questionStr = questionStr;
         this.correctAns = correctAns;
         this.incorrectAns = incorrectAns;
-        if (ansType === 'boolean') {
+        if (this.ansType === 'boolean') {
             this.answerList = ['True', 'False'];
         } else {
-            this.answerList = incorrectAns.slice();
-            this.answerList.splice(Util.random(0, incorrectAns.length - 1), 0, correctAns);
+            this.answerList = this.incorrectAns.slice();
+            this.answerList.splice(Util.random(0, this.incorrectAns.length - 1), 0, this.correctAns);
         }
     }
 
