@@ -1,3 +1,4 @@
+const { trivia_categories } = require('./trivia-categories.json');
 const { User } = require('discord.js');
 const Util = require('./util.js');
 
@@ -121,18 +122,44 @@ class TriviaSession {
         }
     }
 
+    /**
+     * Return URL for the Trivia API
+     * @param {number} numQ 
+     * @param {number|string} category 
+     * @param {string} difficulty 
+     * @param {string} type 
+     * @returns {string}
+     */
     static createTriviaURL(numQ, category, difficulty, type) {
         let url = `https://opentdb.com/api.php?amount=${numQ}`;
+        if (isNaN(parseInt(category))) {
+            const found = TriviaQuestion.categories.find((element) => element.name.toLowerCase() === category.toLowerCase());
+            console.log(found);
+            category = found ? found.id : -1;
+        }
         if (category >= 9 && category <= 32) {
             url += `&category=${category}`;
         }
-        if (TriviaQuestion.difficulties().indexOf(difficulty) > 0) {
+        if (TriviaQuestion.difficulties.indexOf(difficulty) > 0) {
             url += `&difficulty=${difficulty}`;
         }
-        if (TriviaQuestion.questionTypes().indexOf(type) > 0) {
+        if (TriviaQuestion.questionTypes.indexOf(type) > 0) {
             url += `&type=${type}`;
         }
         return url;
+    }
+
+    /**
+     * Post a message with all the possible trivia categories
+     * @param {Channel} channel 
+     */
+    static showCategories(channel) {
+        let messageText = 'Categories:\n';
+        for (const i in TriviaQuestion.categories) {
+            messageText += TriviaQuestion.categories[i].name + (i < TriviaQuestion.categories.length - 1 ? ', ' : '');
+        }
+
+        channel.send(messageText);
     }
 }
 
@@ -182,14 +209,6 @@ class TriviaQuestion {
         );
     }
 
-    static questionTypes() {
-        return ['any', 'boolean', 'multiple'];
-    }
-
-    static difficulties() {
-        return ['any', 'easy', 'medium', 'hard'];
-    }
-
     /**
      * Returns the formatted message of the trivia question.
      * @param {number} number The question number in the trivia session
@@ -220,6 +239,17 @@ class TriviaQuestion {
         throw 'Invalid answer';
     }
 }
+
+TriviaQuestion.categories = trivia_categories.map((category) => {
+    return {
+        id: category.id,
+        name: category.simpleName? category.simpleName : category.name
+    }
+});
+
+TriviaQuestion.questionTypes = ['any', 'boolean', 'multiple'];
+
+TriviaQuestion.difficulties = ['any', 'easy', 'medium', 'hard'];
 
 module.exports = {
     TriviaSession: TriviaSession,

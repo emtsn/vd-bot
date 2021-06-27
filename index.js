@@ -52,8 +52,12 @@ function runCommand(message, command, split) {
         case 'trivia':
             if (!trivia || !trivia.active) {
                 const category = split.length >= 2 ? split[1] : -1;
-                const difficulty = split.length >= 3 && TriviaQuestion.difficulties().includes(split[2].toLowerCase()) ? split[2] : 'any';
-                const type = split.length >= 4 && TriviaQuestion.questionTypes().includes(split[3].toLowerCase()) ? split[3] : 'any';
+                if (category === 'categories') {
+                    TriviaSession.showCategories(message.channel);
+                    break;
+                }
+                const difficulty = split.length >= 3 && TriviaQuestion.difficulties.includes(split[2].toLowerCase()) ? split[2] : 'any';
+                const type = split.length >= 4 && TriviaQuestion.questionTypes.includes(split[3].toLowerCase()) ? split[3] : 'any';
                 startTrivia(message.channel, 10, category, difficulty, type);
             }
             break;
