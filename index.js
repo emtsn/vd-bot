@@ -4,7 +4,6 @@ const client = new Discord.Client();
 const { TriviaSession, TriviaQuestion } = require('./trivia.js');
 const { Poll } = require('./poll.js');
 const Util = require('./util.js');
-const fetch = require('node-fetch');
 const ytdl = require('ytdl-core');
 
 const commands = {
@@ -98,8 +97,27 @@ function runCommand(message, command, options, params, rest) {
             }
             break;
         case 'trivia':
+            if (trivia && params.length >= 1 && message.channel.id === trivia.channel.id) {
+                if (!trivia.active && params[0] === 'continue') {
+                    trivia.loadQuestions().then(() => {
+                        trivia.start();
+                    }).catch((error) => {
+                        console.error(error);
+                        channel.send('[Error] Failed to get trivia questions.');
+                    });
+                    break
+                } else if (trivia.active && params[0] === 'stop') {
+                    trivia.stop();
+                    message.channel.send('Stopping Trivia...').then((msg) => {
+                        trivia.showAnswer();
+                        trivia.showScores();
+                        msg.delete();
+                    });
+                    break;
+                }
+            }
             if (!trivia || !trivia.active) {
-                const category = params.length >= 1 ? params[0] : -1;
+                const category = params.length >= 1 ? params[0] : '-1';
                 if (category === 'categories') {
                     TriviaSession.showCategories(message.channel);
                     break;
@@ -166,33 +184,14 @@ function startPoll(channel, timer, options) {
  * @param {string} type Type of the trivia questions
  */
 function startTrivia(channel, numQ, category, difficulty, type) {
-    numQ = numQ > 50 ? 50 : numQ;
-    numQ = numQ < 1 ? 1 : numQ;
     const timer = 20;
-    console.log(`trivia: ${numQ}, ${category}, ${difficulty}, ${type}`);
-    const url = TriviaSession.createTriviaURL(numQ, category, difficulty, type);
-    // TODO: add token
-    fetch(url)
-        .then(result => result.json())
-        .then(json => {
-            const questions = [];
-            const response = json['response_code'];
-            if (response === 0) {
-                for (let i = 0; i < numQ; i++) {
-                    questions.push(TriviaQuestion.fromJson(json.results[i]));
-                }
-            } else if (response === 3 || response === 4) {
-                // TODO: get new token
-            } else {
-                throw `Response error ${response}`;
-            }
-            trivia = new TriviaSession(channel, timer, questions);
-            trivia.start();
-        })
-        .catch((error) => {
-            console.error(error);
-            channel.send('[Error] Failed to get trivia questions.');
-        });
+    trivia = new TriviaSession(channel, timer, numQ, category, difficulty, type);
+    trivia.loadQuestions().then(() => {
+        trivia.start();
+    }).catch((error) => {
+        console.error(error);
+        channel.send('[Error] Failed to get trivia questions.');
+    });
 }
 
 /**
