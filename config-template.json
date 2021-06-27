@@ -1,0 +1,4 @@
+{
+    "prefix": "Pick a prefix for commands (e.g. '!', '?', '>', etc...)",
+    "token": "Insert your Discord bot token here"
+}
