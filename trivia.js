@@ -1,4 +1,7 @@
+const { User } = require('discord.js');
 const Util = require('./util.js');
+
+const booleanAnswers = ['true', 'false', 't', 'f'];
 
 class TriviaSession {
     /**
@@ -12,7 +15,13 @@ class TriviaSession {
         this.timer = timer;
         this.questions = questions;
         this.questNum = 0;
+        /** @type {Map<User, number>} */
         this.userAnswer = new Map();
+        /**
+         * @typedef {{ correct: number, incorrect: number }} Score
+         * @type {Map<User, Score>}
+         */
+        this.userScores = new Map();
         this.active = false;
     }
 
@@ -27,6 +36,7 @@ class TriviaSession {
         this.interval = setInterval(() => {
             this.showAnswer();
             if (this.questNum >= this.questions.length - 1) {
+                this.showScores();
                 this.stop();
                 return;
             }
@@ -58,8 +68,20 @@ class TriviaSession {
         this.channel.send(`Answer: ${this.questions[this.questNum].correctAns}`);
         let winners = '';
         for (const [user, answer] of this.userAnswer) {
+            const currentScore = this.userScores.get(user);
             if (answer) {
                 winners += `${user} `;
+                if (currentScore) {
+                    currentScore.correct++;
+                } else {
+                    this.userScores.set(user, { correct: 1, incorrect: 0 });
+                }
+            } else {
+                if (currentScore) {
+                    currentScore.incorrect++;
+                } else {
+                    this.userScores.set(user, { correct: 0, incorrect: 1 });
+                }
             }
         }
         if (winners !== '') {
@@ -69,14 +91,30 @@ class TriviaSession {
     }
 
     /**
+     * Send a message containing scores for questions so far
+     */
+    showScores() {
+        let scoreMessage = 'Scores:\n'
+        for (const [user, score] of this.userScores) {
+            scoreMessage += user.toString() + ': ' + score.correct + ' point' + (score.correct === 1 ? '' : 's') + '\n';
+        }
+        this.channel.send(scoreMessage);
+    }
+
+    /**
      * Answer the current trivia question.
      * @param message The message that was used to answer the current trivia question
      */
     answerQuestion(message) {
-        if (this.questions[this.questNum].checkAns(message.content)) {
+        let check;
+        try {
+            check = this.questions[this.questNum].checkAns(message.content);
+        } catch {
+            return;
+        }
+        if (check) {
             console.log(`${message.author} got the correct answer`);
             this.userAnswer.set(message.author, true);
-            // TODO: keep track of points for users
         } else {
             console.log(`${message.author} got the wrong answer`);
             this.userAnswer.set(message.author, false);
@@ -166,21 +204,20 @@ class TriviaQuestion {
     }
 
     /**
-     * Take the userAns and check if it is the correct answer.
+     * Take the userAns and check if it is the correct answer. Throw an error if the answer is not one of the valid possible answers.
      * @param {string} userAns The answer to check
      * @returns {boolean} True if the answer is correct, false otherwise
      */
     checkAns(userAns) {
-        userAns = userAns.replace(/\s+/g, '').toLowerCase();
+        userAns = userAns.replace(/\s/g, '').toLowerCase();
         const ansInt = parseInt(userAns);
         if (!isNaN(ansInt) && Util.isBetween(ansInt, 1, this.answerList.length)) {
             return this.answerList[ansInt - 1] === this.correctAns;
-        } else if (this.ansType === 'boolean') {
+        } else if (this.ansType === 'boolean' && booleanAnswers.contains(userAns)) {
             return userAns === this.correctAns.toLowerCase() ||
                 userAns === this.correctAns[0].toLowerCase();
-        } else {
-            return userAns === this.correctAns.replace(/\s+/g, '').toLowerCase();
         }
+        throw 'Invalid answer';
     }
 }
 

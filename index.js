@@ -8,7 +8,9 @@ const fetch = require('node-fetch');
 const ytdl = require('ytdl-core');
 
 // TODO: handle multiple channels, servers, trivia, poll at a time
+/** @type {TriviaSession} */
 let trivia;
+/** @type {Poll} */
 let poll;
 
 client.once('ready', () => {
@@ -26,7 +28,7 @@ client.on('message', message => {
             const split = message.content.split(' ');
             const command = split[0].slice(prefix.length).toLowerCase();
             runCommand(message, command, split);
-        } else if (trivia && trivia.active) {
+        } else if (trivia && trivia.active && trivia.channel.id === message.channel.id) {
             trivia.answerQuestion(message);
         }
     }
