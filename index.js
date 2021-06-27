@@ -7,6 +7,17 @@ const Util = require('./util.js');
 const fetch = require('node-fetch');
 const ytdl = require('ytdl-core');
 
+const commands = {
+    'poll': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}poll [timer] [option1], [option2], [option3], ...` },
+    'trivia': { params: 3, helpMsg: `Usage: ${prefix}trivia [category (optional)] [difficulty (optional)] [type (optional)]` },
+    'id': { helpMsg: `Usage: ${prefix}id` },
+    'avatar': { helpMsg: `Usage: ${prefix}avatar` },
+    'random': { params: 2, requiredParams: 2, helpMsg: `Usage: ${prefix}random [number] [number]` },
+    // 'clear': { helpMsg: `Usage: ${prefix}clear` },
+    'play': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}play [YouTube URL]` },
+    'help': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}help [command]` }
+}
+
 // TODO: handle multiple channels, servers, trivia, poll at a time
 /** @type {TriviaSession} */
 let trivia;
@@ -25,9 +36,18 @@ client.on('message', message => {
     console.log('[' + Util.dateTimeFormat(message.createdAt) + '] ' + message.content);
     if (message.guild && message.author.id !== client.user.id) {
         if (message.content.startsWith(prefix)) {
-            const split = message.content.split(' ');
-            const command = split[0].slice(prefix.length).toLowerCase();
-            runCommand(message, command, split);
+            let firstSplit = message.content.indexOf(' ');
+            if (firstSplit < 0) firstSplit = message.content.length;
+            const command = message.content.substring(prefix.length, firstSplit).toLowerCase();
+            const notcommand = message.content.substring(firstSplit + 1, message.content.length);
+            const options = commands[command];
+            if (!options) return;
+            const { split, rest } = splitString(notcommand, options.params);
+            if (options.requiredSplit && split.length < options.requiredParams) {
+                if (options.helpMsg) message.channel.send(options.helpMsg);
+                return;
+            }
+            runCommand(message, command, options, split, rest);
         } else if (trivia && trivia.active && trivia.channel.id === message.channel.id) {
             trivia.answerQuestion(message);
         }
@@ -35,29 +55,57 @@ client.on('message', message => {
 });
 
 /**
+ * Splits the string by space, limited by limit, and returns the split and the remaining rest of the string
+ * @param {string} str 
+ * @param {number?} limit 
+ * @returns {{ split: string[], rest: string }}
+ */
+function splitString(str, limit = null) {
+    let currentStart = 0;
+    let split = [];
+    for (let i = 0; i <= str.length; i++) {
+        if ((i === str.length || str[i] === ' ') && i > currentStart) {
+            split.push(str.substring(currentStart, i));
+            currentStart = i + 1;
+            if (limit != null && split.length >= limit) {
+                break;
+            }
+        }
+    }
+    return {
+        split,
+        rest: str.substring(currentStart, str.length)
+    }
+}
+
+/**
  * Run a bot command
  * @param {Message} message The Message that was sent that activated this command
  * @param {string} command The string of the command name
- * @param {string[]} split An array of strings that is each word in the message content
+ * @param {{ params: number?, requiredParams: number?, helpMsg: string? }} options The options for the command
+ * @param {string[]} params The array of string of the parameters
+ * @param {string} rest The string of the rest of the message with the command + parameters removed
  */
-function runCommand(message, command, split) {
+function runCommand(message, command, options, params, rest) {
+    console.log(command + '(' + params.join(', ') + (rest ? ' : ' + rest : '') + ')');
     switch (command) {
         case 'poll':
-            if ((!poll || !poll.active) && split.length > 3) {
-                let timer = parseInt(split[1]);
+            if ((!poll || !poll.active) && rest) {
+                let timer = parseInt(params[0]);
                 if (isNaN(timer)) timer = 0;
-                startPoll(message.channel, timer, split.slice(2, split.length));
+                const options = rest.split(',').map((option) => option.trim());
+                startPoll(message.channel, timer, options);
             }
             break;
         case 'trivia':
             if (!trivia || !trivia.active) {
-                const category = split.length >= 2 ? split[1] : -1;
+                const category = params.length >= 1 ? params[0] : -1;
                 if (category === 'categories') {
                     TriviaSession.showCategories(message.channel);
                     break;
                 }
-                const difficulty = split.length >= 3 && TriviaQuestion.difficulties.includes(split[2].toLowerCase()) ? split[2] : 'any';
-                const type = split.length >= 4 && TriviaQuestion.questionTypes.includes(split[3].toLowerCase()) ? split[3] : 'any';
+                const difficulty = params.length >= 2 && TriviaQuestion.difficulties.includes(params[1].toLowerCase()) ? params[1] : 'any';
+                const type = params.length >= 3 && TriviaQuestion.questionTypes.includes(params[2].toLowerCase()) ? params[2] : 'any';
                 startTrivia(message.channel, 10, category, difficulty, type);
             }
             break;
@@ -68,20 +116,16 @@ function runCommand(message, command, split) {
             message.channel.send(message.author.displayAvatarURL({ format: 'png', dynamic: true }));
             break;
         case 'random':
-            if (split.length === 3) {
-                let min = parseInt(split[1]);
-                let max = parseInt(split[2]);
-                min = isNaN(min) ? 0 : min;
-                max = isNaN(max) ? min + 1 : max;
-                if (max < min) {
-                    const temp = max;
-                    max = min;
-                    min = temp;
-                }
-                message.channel.send(`Roll [${min},${max}]: ${Util.random(min, max)}`);
-            } else {
-                message.channel.send(`Usage: ${prefix}random [number] [number]`);
+            let min = parseInt(params[0]);
+            let max = parseInt(params[1]);
+            min = isNaN(min) ? 0 : min;
+            max = isNaN(max) ? min + 1 : max;
+            if (max < min) {
+                const temp = max;
+                max = min;
+                min = temp;
             }
+            message.channel.send(`Roll [${min},${max}]: ${Util.random(min, max)}`);
             break;
         // case 'clear':
         //     if (message.member.hasPermission('ADMINISTRATOR')) {
@@ -89,10 +133,14 @@ function runCommand(message, command, split) {
         //     }
         //     break;
         case 'play':
-            if (split.length === 2) {
-                playMusic(message, split[1]);
+            playMusic(message, params[0]);
+            break;
+        case 'help':
+            const helpCommandOptions = commands[params[0]];
+            if (!helpCommandOptions) {
+                message.channel.send(options.helpMsg);
             } else {
-                message.channel.send(`Usage: ${prefix}play [YouTube URL]`);
+                message.channel.send(helpCommandOptions.helpMsg);
             }
             break;
     }
