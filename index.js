@@ -20,7 +20,7 @@ client.on('messageReactionAdd', (messageReaction, user) => {
 });
 
 client.on('message', message => {
-    console.log(message.content);
+    console.log('[' + Util.dateTimeFormat(message.createdAt) + '] ' + message.content);
     if (message.guild && message.author.id !== client.user.id) {
         if (message.content.startsWith(prefix)) {
             const split = message.content.split(' ');
@@ -114,41 +114,30 @@ function startPoll(channel, timer, options) {
 function startTrivia(channel, numQ, category, difficulty, type) {
     numQ = numQ > 50 ? 50 : numQ;
     numQ = numQ < 1 ? 1 : numQ;
-    console.log(`trivia: ${numQ}, ${category}, ${difficulty}, ${type}`);
-    let url = `https://opentdb.com/api.php?amount=${numQ}`;
     const timer = 20;
-    if (category >= 9 && category <= 32) {
-        url += `&category=${category}`;
-    }
-    if (TriviaQuestion.difficulties().indexOf(difficulty) > 0) {
-        url += `&difficulty=${difficulty}`;
-    }
-    if (TriviaQuestion.questionTypes().indexOf(type) > 0) {
-        url += `&type=${type}`;
-    }
+    console.log(`trivia: ${numQ}, ${category}, ${difficulty}, ${type}`);
+    const url = TriviaSession.createTriviaURL(numQ, category, difficulty, type);
     // TODO: add token
     fetch(url)
         .then(result => result.json())
         .then(json => {
             const questions = [];
-            try {
-                const response = json['response_code'];
-                if (response === 0) {
-                    for (let i = 0; i < numQ; i++) {
-                        questions.push(TriviaQuestion.fromJson(json.results[i]));
-                    }
-                } else if (response === 3 || response === 4) {
-                    // TODO: get new token
-                } else {
-                    throw `Response error ${response}`;
+            const response = json['response_code'];
+            if (response === 0) {
+                for (let i = 0; i < numQ; i++) {
+                    questions.push(TriviaQuestion.fromJson(json.results[i]));
                 }
-            } catch(error) {
-                console.error(error);
-                channel.send('[Error] Failed to get trivia questions.');
-                return;
+            } else if (response === 3 || response === 4) {
+                // TODO: get new token
+            } else {
+                throw `Response error ${response}`;
             }
             trivia = new TriviaSession(channel, timer, questions);
             trivia.start();
+        })
+        .catch((error) => {
+            console.error(error);
+            channel.send('[Error] Failed to get trivia questions.');
         });
 }
 

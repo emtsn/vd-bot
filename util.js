@@ -34,8 +34,28 @@ function replaceHTML(str) {
         .replace(/&amp;/g, '&');
 }
 
+/**
+ * Add '0' in front of a number if it is single-digit (0-9)
+ * @param {number} num 
+ * @returns {string}
+ */
+function addPrefixZero(num) {
+    return (num < 10 ? '0' : '') + num;
+}
+
+/**
+ * Format date as yyyy-mm-dd hh:mm:ss
+ * @param {Date} date 
+ * @returns {string}
+ */
+function dateTimeFormat(date) {
+    return date.getFullYear() + '-' + addPrefixZero(date.getMonth()) + '-' + addPrefixZero(date.getDate()) + ' '
+        + addPrefixZero(date.getHours()) + ':' + addPrefixZero(date.getMinutes()) + ':' + addPrefixZero(date.getSeconds());
+}
+
 module.exports = {
     random: random,
     isBetween: isBetween,
     replaceHTML: replaceHTML,
+    dateTimeFormat: dateTimeFormat
 };

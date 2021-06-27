@@ -83,6 +83,19 @@ class TriviaSession {
         }
     }
 
+    static createTriviaURL(numQ, category, difficulty, type) {
+        let url = `https://opentdb.com/api.php?amount=${numQ}`;
+        if (category >= 9 && category <= 32) {
+            url += `&category=${category}`;
+        }
+        if (TriviaQuestion.difficulties().indexOf(difficulty) > 0) {
+            url += `&difficulty=${difficulty}`;
+        }
+        if (TriviaQuestion.questionTypes().indexOf(type) > 0) {
+            url += `&type=${type}`;
+        }
+        return url;
+    }
 }
 
 class TriviaQuestion {
