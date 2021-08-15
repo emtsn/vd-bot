@@ -5,6 +5,12 @@ const { TriviaSession, TriviaQuestion } = require('./trivia.js');
 const { Poll } = require('./poll.js');
 const Util = require('./util.js');
 const ytdl = require('ytdl-core');
+require('@tensorflow/tfjs');
+const mobilenet = require('@tensorflow-models/mobilenet');
+const { createCanvas, loadImage } = require('canvas')
+
+let model;
+mobilenet.load().then((md) => { model = md });
 
 const commands = {
     'poll': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}poll [timer] [option1], [option2], [option3], ...` },
@@ -14,7 +20,8 @@ const commands = {
     'random': { params: 2, requiredParams: 2, helpMsg: `Usage: ${prefix}random [number] [number]` },
     // 'clear': { helpMsg: `Usage: ${prefix}clear` },
     'play': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}play [YouTube URL]` },
-    'help': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}help [command]` }
+    'help': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}help [command]` },
+    'whatis': { params: 1 }
 }
 
 // TODO: handle multiple channels, servers, trivia, poll at a time
@@ -159,6 +166,43 @@ function runCommand(message, command, options, params, rest) {
                 message.channel.send(options.helpMsg);
             } else {
                 message.channel.send(helpCommandOptions.helpMsg);
+            }
+            break;
+        case 'whatis':
+            if (model) {
+                let url;
+                if (params.length > 0) {
+                    if (!params[0].startsWith('<@!') && !params[0].endsWith('>')) {
+                        url = params[0];
+                    } else if (message.mentions.members && message.mentions.members.size > 0) {
+                        const firstMentioned = message.mentions.members.values().next();
+                        if (!firstMentioned || !firstMentioned.value) return;
+                        url = firstMentioned.value.user.displayAvatarURL({ format: 'png', dynamic: true });
+                    }
+                } else if (message.attachments.size > 0) {
+                    const firstAttachment = message.attachments.values().next();
+                    if (!firstAttachment || !firstAttachment.value || !firstAttachment.value.url) return;
+                    url = firstAttachment.value.url;
+                }
+                if (!url) return;
+                loadImage(url).then((img) => {
+                    console.log('MobileNet: ' + url + ' (' + img.width + 'x' + img.height + ')');
+                    const canvas = createCanvas(img.width > 4000 ? 4000 : img.width, img.height > 4000 ? 4000 : img.height);
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    return model.classify({ data: Uint8Array.from(imageData.data), width: canvas.width, height: canvas.height }).then(predictions => {
+                        let predictionText = 'I think this is a...\n';
+                        for (const { className, probability } of predictions) {
+                            predictionText += '- ' + className + ': ' + Math.round(probability * 10000) / 100 + '%\n';
+                        }
+                        message.channel.send(predictionText);
+                    });
+                }).catch(err => {
+                    console.error('Failed to load image:' + url + ' (' + typeof url + ')');
+                    console.error(err);
+                    message.channel.send(`I didn't receive a valid image URL or a specific user!`)
+                });
             }
             break;
     }
