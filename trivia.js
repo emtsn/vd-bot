@@ -1,5 +1,5 @@
 const { trivia_categories } = require('./trivia-categories.json');
-const { User } = require('discord.js');
+const { User, Message, Channel, TextChannel, DMChannel, NewsChannel } = require('discord.js');
 const fetch = require('node-fetch');
 const Util = require('./util.js');
 
@@ -158,7 +158,7 @@ class TriviaSession {
 
     /**
      * Answer the current trivia question.
-     * @param message The message that was used to answer the current trivia question
+     * @param {Message} message The message that was used to answer the current trivia question
      */
     answerQuestion(message) {
         let check;

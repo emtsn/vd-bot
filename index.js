@@ -1,6 +1,6 @@
 const { prefix, token } = require('./config.json');
-const Discord = require('discord.js');
-const client = new Discord.Client();
+const { Client, Message, TextChannel, DMChannel, NewsChannel } = require('discord.js');
+const client = new Client();
 const { TriviaSession, TriviaQuestion } = require('./trivia.js');
 const { Poll } = require('./poll.js');
 const Util = require('./util.js');
