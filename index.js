@@ -4,7 +4,6 @@ const client = new Client();
 const { TriviaSession, TriviaQuestion } = require('./trivia.js');
 const { Poll } = require('./poll.js');
 const Util = require('./util.js');
-const ytdl = require('ytdl-core');
 
 const commands = {
     'poll': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}poll [timer] [option1], [option2], [option3], ...` },
@@ -13,7 +12,6 @@ const commands = {
     'avatar': { helpMsg: `Usage: ${prefix}avatar` },
     'random': { params: 2, requiredParams: 2, helpMsg: `Usage: ${prefix}random [number] [number]` },
     // 'clear': { helpMsg: `Usage: ${prefix}clear` },
-    'play': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}play [YouTube URL]` },
     'help': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}help [command]` }
 }
 
@@ -150,9 +148,6 @@ function runCommand(message, command, options, params, rest) {
         //         message.channel.bulkDelete(100, true).catch(console.error);
         //     }
         //     break;
-        case 'play':
-            playMusic(message, params[0]);
-            break;
         case 'help':
             const helpCommandOptions = commands[params[0]];
             if (!helpCommandOptions) {
@@ -192,32 +187,6 @@ function startTrivia(channel, numQ, category, difficulty, type) {
         console.error(error);
         channel.send('[Error] Failed to get trivia questions.');
     });
-}
-
-/**
- * Play music from a website link.
- * @param {Message} message The message that was sent that activated this command
- * @param {string} link The url of the website
- */
-function playMusic(message, link) {
-    if (message.member.voice.channel) {
-        if (ytdl.validateURL(link)) {
-            message.member.voice.channel.join().then(connection => {
-                const dispatcher = connection.play(ytdl(link, { filter: 'audioonly' }))
-                    .catch(console.error);
-                dispatcher.setVolume(0.5);
-                dispatcher.on('finish', () => {
-                    connection.disconnect();
-                });
-            });
-        } else {
-            message.channel.send('Invalid YouTube URL')
-                .then(helpMsg => helpMsg.delete({ timeout: 5000 }));
-        }
-    } else {
-        message.channel.send('Must be in a voice channel to use this command.')
-            .then(helpMsg => helpMsg.delete({ timeout: 5000 }));
-    }
 }
 
 client.login(token);
