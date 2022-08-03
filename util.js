@@ -37,7 +37,7 @@ function replaceHTML(str) {
 
 /**
  * Add '0' in front of a number if it is single-digit (0-9)
- * @param {number} num 
+ * @param {number} num
  * @returns {string}
  */
 function addPrefixZero(num) {
@@ -46,7 +46,7 @@ function addPrefixZero(num) {
 
 /**
  * Format date as yyyy-mm-dd hh:mm:ss
- * @param {Date} date 
+ * @param {Date} date
  * @returns {string}
  */
 function dateTimeFormat(date) {
@@ -58,5 +58,5 @@ module.exports = {
     random: random,
     isBetween: isBetween,
     replaceHTML: replaceHTML,
-    dateTimeFormat: dateTimeFormat
+    dateTimeFormat: dateTimeFormat,
 };

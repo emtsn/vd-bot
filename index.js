@@ -12,8 +12,8 @@ const commands = {
     'avatar': { helpMsg: `Usage: ${prefix}avatar` },
     'random': { params: 2, requiredParams: 2, helpMsg: `Usage: ${prefix}random [number] [number]` },
     // 'clear': { helpMsg: `Usage: ${prefix}clear` },
-    'help': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}help [command]` }
-}
+    'help': { params: 1, requiredParams: 1, helpMsg: `Usage: ${prefix}help [command]` },
+};
 
 // TODO: handle multiple channels, servers, trivia, poll at a time
 /** @type {TriviaSession} */
@@ -53,13 +53,13 @@ client.on('message', message => {
 
 /**
  * Splits the string by space, limited by limit, and returns the split and the remaining rest of the string
- * @param {string} str 
- * @param {number?} limit 
+ * @param {string} str
+ * @param {number?} limit
  * @returns {{ split: string[], rest: string }}
  */
 function splitString(str, limit = null) {
     let currentStart = 0;
-    let split = [];
+    const split = [];
     for (let i = 0; i <= str.length; i++) {
         if ((i === str.length || str[i] === ' ') && i > currentStart) {
             split.push(str.substring(currentStart, i));
@@ -71,8 +71,8 @@ function splitString(str, limit = null) {
     }
     return {
         split,
-        rest: str.substring(currentStart, str.length)
-    }
+        rest: str.substring(currentStart, str.length),
+    };
 }
 
 /**
@@ -90,8 +90,7 @@ function runCommand(message, command, options, params, rest) {
             if ((!poll || !poll.active) && rest) {
                 let timer = parseInt(params[0]);
                 if (isNaN(timer)) timer = 0;
-                const options = rest.split(',').map((option) => option.trim());
-                startPoll(message.channel, timer, options);
+                startPoll(message.channel, timer, rest.split(',').map((option) => option.trim()));
             }
             break;
         case 'trivia':
@@ -101,9 +100,9 @@ function runCommand(message, command, options, params, rest) {
                         trivia.start();
                     }).catch((error) => {
                         console.error(error);
-                        channel.send('[Error] Failed to get trivia questions.');
+                        message.channel.send('[Error] Failed to get trivia questions.');
                     });
-                    break
+                    break;
                 } else if (trivia.active && params[0] === 'stop') {
                     trivia.stop();
                     message.channel.send('Stopping Trivia...').then((msg) => {
@@ -132,16 +131,7 @@ function runCommand(message, command, options, params, rest) {
             message.channel.send(message.author.displayAvatarURL({ format: 'png', dynamic: true }));
             break;
         case 'random':
-            let min = parseInt(params[0]);
-            let max = parseInt(params[1]);
-            min = isNaN(min) ? 0 : min;
-            max = isNaN(max) ? min + 1 : max;
-            if (max < min) {
-                const temp = max;
-                max = min;
-                min = temp;
-            }
-            message.channel.send(`Roll [${min},${max}]: ${Util.random(min, max)}`);
+            rollRandom(message.channel, parseInt(params[0]), parseInt(params[1]));
             break;
         // case 'clear':
         //     if (message.member.hasPermission('ADMINISTRATOR')) {
@@ -149,14 +139,31 @@ function runCommand(message, command, options, params, rest) {
         //     }
         //     break;
         case 'help':
-            const helpCommandOptions = commands[params[0]];
-            if (!helpCommandOptions) {
+            if (!commands[params[0]]) {
                 message.channel.send(options.helpMsg);
             } else {
-                message.channel.send(helpCommandOptions.helpMsg);
+                message.channel.send(commands[params[0]].helpMsg);
             }
             break;
     }
+}
+
+/**
+ * Roll a number between min and max
+ * - Will flip min and max if min is greater than max
+ * @param {TextChannel | DMChannel | NewsChannel} channel The channel the result will be posted
+ * @param {number} min Minimum value (default: 0)
+ * @param {number} max Maximum value (default: min + 1)
+ */
+function rollRandom(channel, min, max) {
+    min = isNaN(min) ? 0 : min;
+    max = isNaN(max) ? min + 1 : max;
+    if (max < min) {
+        const temp = max;
+        max = min;
+        min = temp;
+    }
+    channel.send(`Roll [${min},${max}]: ${Util.random(min, max)}`);
 }
 
 /**

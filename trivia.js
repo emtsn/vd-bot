@@ -22,7 +22,7 @@ class TriviaSession {
         this.timer = timer;
         this.questions = [];
         this.questNum = 0;
-        /** @type {Map<User, number>} */
+        /** @type {Map<User, boolean>} */
         this.userAnswer = new Map();
         /**
          * @typedef {{ correct: number, incorrect: number }} Score
@@ -40,13 +40,13 @@ class TriviaSession {
      * @param {string} type Type of the trivia questions
      */
     setOptions(numQ, category, difficulty, type) {
-        category = parseInt(category);
-        if (isNaN(category)) {
+        let categoryNum = parseInt(category);
+        if (isNaN(categoryNum)) {
             const found = TriviaQuestion.categories.find((element) => element.name.toLowerCase() === category.toLowerCase());
-            category = found ? found.id : -1;
+            categoryNum = found ? found.id : -1;
         }
         this.numQ = numQ;
-        this.category = category 
+        this.category = categoryNum;
         this.difficulty = difficulty;
         this.type = type;
     }
@@ -128,12 +128,10 @@ class TriviaSession {
                 } else {
                     this.userScores.set(user, { correct: 1, incorrect: 0 });
                 }
+            } else if (currentScore) {
+                currentScore.incorrect++;
             } else {
-                if (currentScore) {
-                    currentScore.incorrect++;
-                } else {
-                    this.userScores.set(user, { correct: 0, incorrect: 1 });
-                }
+                this.userScores.set(user, { correct: 0, incorrect: 1 });
             }
         }
         if (winners !== '') {
@@ -146,9 +144,9 @@ class TriviaSession {
      * Send a message containing scores for questions so far
      */
     showScores() {
-        let scoreMessage = 'Scores:\n'
+        let scoreMessage = 'Scores:\n';
         if (this.userScores.size < 1) {
-            scoreMessage += 'Nothing to show...'
+            scoreMessage += 'Nothing to show...';
         }
         for (const [user, score] of this.userScores) {
             scoreMessage += user.toString() + ': ' + score.correct + ' point' + (score.correct === 1 ? '' : 's') + '\n';
@@ -178,10 +176,10 @@ class TriviaSession {
 
     /**
      * Return URL for the Trivia API
-     * @param {number} numQ 
-     * @param {number} category 
-     * @param {string} difficulty 
-     * @param {string} type 
+     * @param {number} numQ
+     * @param {number} category
+     * @param {string} difficulty
+     * @param {string} type
      * @returns {string}
      */
     static createTriviaURL(numQ, category, difficulty, type) {
@@ -203,7 +201,7 @@ class TriviaSession {
 
     /**
      * Post a message with all the possible trivia categories
-     * @param {Channel} channel 
+     * @param {Channel} channel
      */
     static showCategories(channel) {
         let messageText = 'Categories:\n';
@@ -295,8 +293,8 @@ class TriviaQuestion {
 TriviaQuestion.categories = trivia_categories.map((category) => {
     return {
         id: category.id,
-        name: category.simpleName? category.simpleName : category.name
-    }
+        name: category.simpleName ? category.simpleName : category.name,
+    };
 });
 
 TriviaQuestion.questionTypes = ['any', 'boolean', 'multiple'];
